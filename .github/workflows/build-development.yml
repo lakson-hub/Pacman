@@ -1,0 +1,161 @@
+name: Build Unity Project (Development)
+
+on:
+  push:
+    branches:
+      - development
+  workflow_dispatch:
+
+concurrency:
+  group: unity-cli-build-development
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    if: github.ref == 'refs/heads/development'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    env:
+      UNITY_NON_INTERACTIVE: "1"
+      UNITY_NO_UPDATE_CHECK: "1"
+      UNITY_NO_CONSENT_PROMPT: "1"
+      UNITY_NO_CRASH_REPORT: "1"
+      UNITY_INSTALL_MISSING_TOOLS: "1"
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - name: WebGL
+            os: ubuntu-latest
+            module: webgl
+            profile: Assets/Settings/Build Profiles/Web - Desktop - Release.asset
+            output: build/WebGL
+            artifactPath: build/WebGL
+          - name: Windows
+            os: windows-latest
+            module: windows-il2cpp
+            profile: Assets/Settings/Build Profiles/Windows.asset
+            output: build/Windows/Pacman.exe
+            artifactPath: build/Windows
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Cache Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-cli-${{ matrix.name }}-${{ hashFiles('Packages/packages-lock.json') }}
+          restore-keys: |
+            Library-cli-${{ matrix.name }}-
+
+      - name: Read Unity version from project
+        run: |
+          set -euo pipefail
+          VERSION=$(grep -oP 'm_EditorVersion: \K\S+' ProjectSettings/ProjectVersion.txt | tr -d '\r')
+          CHANGESET=$(grep -oP 'm_EditorVersionWithRevision: \S+ \(\K[0-9a-f]+' ProjectSettings/ProjectVersion.txt | tr -d '\r')
+          echo "UNITY_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "UNITY_CHANGESET=$CHANGESET" >> "$GITHUB_ENV"
+          echo "Unity $VERSION ($CHANGESET)"
+
+      - name: Install Editor system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgtk-3-0 libglu1-mesa libnss3 libasound2t64 libxss1 libxtst6 libgbm1 libc6-dev
+
+      - name: Install Unity CLI (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          curl -fsSL https://unity.com/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install Unity CLI (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:UNITY_CLI_CHANNEL = 'beta'
+          irm https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.ps1 | iex
+
+      - name: Add Unity CLI to PATH (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          set -euo pipefail
+          UNITY_CLI_BIN=$(find "$(cygpath -u "$USERPROFILE")" "$(cygpath -u "$LOCALAPPDATA")" -maxdepth 6 -type f -iname unity.exe 2>/dev/null | head -n1)
+          test -n "$UNITY_CLI_BIN"
+          cygpath -w "$(dirname "$UNITY_CLI_BIN")" >> "$GITHUB_PATH"
+          echo "Unity CLI: $UNITY_CLI_BIN"
+
+      - name: Install Unity Editor with module
+        run: |
+          set -euo pipefail
+          unity --version
+          unity install "$UNITY_VERSION" -c "$UNITY_CHANGESET" -m ${{ matrix.module }}
+
+      - name: Locate Unity Editor binary
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            EDITOR_PATH=$(find "/c/Program Files/Unity" "$(cygpath -u "$USERPROFILE")" -type f -iname Unity.exe -path "*${UNITY_VERSION}*/Editor/Unity.exe" 2>/dev/null | head -n1)
+          else
+            EDITOR_PATH=$(find "$HOME" /opt -type f -name Unity -path "*${UNITY_VERSION}*/Editor/Unity" 2>/dev/null | head -n1)
+          fi
+          test -n "$EDITOR_PATH"
+          echo "UNITY_EDITOR_PATH=$EDITOR_PATH" >> "$GITHUB_ENV"
+          echo "Editor: $EDITOR_PATH"
+
+      - name: Activate Unity Personal license
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          EDITOR_DIR=$(dirname "$UNITY_EDITOR_PATH")
+          LICENSING_CLIENT=$(find "$EDITOR_DIR" -type f -name 'Unity.Licensing.Client*' ! -name '*.dll' ! -name '*.pdb' ! -name '*.json' | head -n1)
+          test -n "$LICENSING_CLIENT"
+          chmod +x "$LICENSING_CLIENT" || true
+          echo "UNITY_LICENSING_CLIENT=$LICENSING_CLIENT" >> "$GITHUB_ENV"
+          "$LICENSING_CLIENT" --activate-all --include-personal --username "$UNITY_EMAIL" --password "$UNITY_PASSWORD"
+
+      - name: Build player
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "${{ matrix.output }}")"
+          PREFIX=""
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            PREFIX="xvfb-run --auto-servernum"
+          fi
+          $PREFIX "$UNITY_EDITOR_PATH" \
+            -batchmode \
+            -nographics \
+            -quit \
+            -projectPath "$GITHUB_WORKSPACE" \
+            -activeBuildProfile "${{ matrix.profile }}" \
+            -build "$GITHUB_WORKSPACE/${{ matrix.output }}" \
+            -logFile - | cat
+
+      - name: Return Unity license
+        if: always()
+        continue-on-error: true
+        run: |
+          if [ -n "${UNITY_LICENSING_CLIENT:-}" ]; then
+            "$UNITY_LICENSING_CLIENT" --return-ulf
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Build-${{ matrix.name }}
+          path: ${{ matrix.artifactPath }}
+          retention-days: 2
+          if-no-files-found: error
