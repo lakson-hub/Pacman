@@ -121,7 +121,8 @@ jobs:
         run: |
           set -euo pipefail
           EDITOR_DIR=$(dirname "$UNITY_EDITOR_PATH")
-          LICENSING_CLIENT=$(find "$EDITOR_DIR" -type f -name 'Unity.Licensing.Client*' ! -name '*.dll' ! -name '*.pdb' ! -name '*.json' | head -n1)
+          find "$EDITOR_DIR" -type f -name 'Unity.Licensing.Client*'
+          LICENSING_CLIENT=$(find "$EDITOR_DIR" -type f \( -name 'Unity.Licensing.Client' -o -name 'Unity.Licensing.Client.exe' \) | head -n1)
           test -n "$LICENSING_CLIENT"
           chmod +x "$LICENSING_CLIENT" || true
           echo "UNITY_LICENSING_CLIENT=$LICENSING_CLIENT" >> "$GITHUB_ENV"
