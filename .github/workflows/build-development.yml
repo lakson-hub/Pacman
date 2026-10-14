@@ -129,6 +129,7 @@ jobs:
           "$LICENSING_CLIENT" --activate-all --include-personal --username "$UNITY_EMAIL" --password "$UNITY_PASSWORD"
 
       - name: Build player
+        timeout-minutes: 60
         run: |
           set -euo pipefail
           mkdir -p "$(dirname "${{ matrix.output }}")"
@@ -136,6 +137,16 @@ jobs:
           if [ "$RUNNER_OS" = "Linux" ]; then
             PREFIX="xvfb-run --auto-servernum"
           fi
+          LOG_FILE="$GITHUB_WORKSPACE/unity-build.log"
+          : > "$LOG_FILE"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            TAIL_FILE="$(cygpath -u "$LOG_FILE")"
+          else
+            TAIL_FILE="$LOG_FILE"
+          fi
+          tail -n +1 -f "$TAIL_FILE" &
+          TAIL_PID=$!
+          set +e
           $PREFIX "$UNITY_EDITOR_PATH" \
             -batchmode \
             -nographics \
@@ -143,7 +154,12 @@ jobs:
             -projectPath "$GITHUB_WORKSPACE" \
             -activeBuildProfile "${{ matrix.profile }}" \
             -build "$GITHUB_WORKSPACE/${{ matrix.output }}" \
-            -logFile - | cat
+            -logFile "$LOG_FILE"
+          UNITY_EXIT=$?
+          set -e
+          sleep 3
+          kill "$TAIL_PID" 2>/dev/null || true
+          exit "$UNITY_EXIT"
 
       - name: Return Unity license
         if: always()
@@ -152,6 +168,11 @@ jobs:
           if [ -n "${UNITY_LICENSING_CLIENT:-}" ]; then
             "$UNITY_LICENSING_CLIENT" --return-ulf
           fi
+
+      - name: Remove IL2CPP backup folder
+        run: |
+          set -euo pipefail
+          find "${{ matrix.artifactPath }}" -maxdepth 1 -type d -name '*_BackUpThisFolder_ButDontShipItWithYourGame' -exec rm -rf {} +
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
