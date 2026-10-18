@@ -202,3 +202,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6d7a0d34cde284f4eaed917b292ae0c5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player
+  movementSpeed: 8
+  playerInput: {fileID: 0}
+  obstaclesLayerMask:
+    serializedVersion: 2
+    m_Bits: 512
