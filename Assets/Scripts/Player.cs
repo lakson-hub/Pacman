@@ -17,11 +17,13 @@ public class Player : MonoBehaviour {
     }
 
     private void HandleMovement() {
-        Vector2 inputVector = playerInput.GetMovementVectorNormalized();
-        Vector2 movementDirection = new Vector2(inputVector.x, inputVector.y);
+        Vector2 movementDirection = playerInput.GetMovementVectorNormalized();
+        
+        if (movementDirection == Vector2.zero) return;
+        
         float movementDistance = movementSpeed * Time.deltaTime;
 
-        float playerRadius = .5f;
+        float playerRadius = .4f;
         bool canMove = !Physics2D.CircleCast(transform.position, playerRadius, movementDirection, movementDistance, obstaclesLayerMask);
 
         if (canMove) {
