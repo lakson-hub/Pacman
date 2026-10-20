@@ -6,7 +6,7 @@ public class Player : MonoBehaviour {
     
     private static readonly Vector2 BOX_SIZE = new Vector2(.8f, .8f);
 
-    [SerializeField] private float movementSpeed = 8f;
+    [SerializeField] private float movementSpeed = 15f;
     [SerializeField] private PlayerInput playerInput;
     [SerializeField] private LayerMask obstaclesLayerMask;
 
