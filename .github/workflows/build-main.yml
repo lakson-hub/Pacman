@@ -161,14 +161,6 @@ jobs:
           kill "$TAIL_PID" 2>/dev/null || true
           exit "$UNITY_EXIT"
 
-      - name: Return Unity license
-        if: always()
-        continue-on-error: true
-        run: |
-          if [ -n "${UNITY_LICENSING_CLIENT:-}" ]; then
-            "$UNITY_LICENSING_CLIENT" --return-ulf
-          fi
-
       - name: Remove IL2CPP backup folder
         run: |
           set -euo pipefail
