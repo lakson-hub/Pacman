@@ -7,6 +7,8 @@ public class Player : MonoBehaviour {
     
     private static readonly Vector2 BOX_SIZE = new Vector2(.8f, .8f);
 
+    private const float PLAYER_DEFAULT_FACING_ANGLE = 0f;
+
     public event EventHandler OnWalkingChanged;
 
     [SerializeField] private float movementSpeed = 15f;
@@ -35,7 +37,7 @@ public class Player : MonoBehaviour {
         float movementDistance = movementSpeed * Time.deltaTime;
 
         if (queuedDirection != Vector2.zero && CanMove(queuedDirection, movementDistance)) {
-            currentDirection = queuedDirection;
+            SetCurrentDirection(queuedDirection);
         }
 
         bool hasMoved = false;
@@ -46,6 +48,18 @@ public class Player : MonoBehaviour {
         }
         
         SetWalking(hasMoved);
+    }
+
+    private void SetCurrentDirection(Vector2 direction) {
+        if (currentDirection == direction) return;
+
+        currentDirection = direction;
+        RotatePlayer(currentDirection);
+    }
+
+    private void RotatePlayer(Vector2 direction) {
+        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+        transform.rotation = Quaternion.Euler(0f, 0f, angle - PLAYER_DEFAULT_FACING_ANGLE);
     }
 
     private void SetWalking(bool isWalking) {
