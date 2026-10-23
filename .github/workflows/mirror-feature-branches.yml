@@ -1,0 +1,76 @@
+name: Mirror Feature Branches to GitLab
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+
+concurrency:
+  group: gitlab-mirror-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    name: Mirror ${{ github.ref_name }}
+    if: ${{ !github.event.deleted }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    env:
+      GITLAB_REPO: ${{ vars.GITLAB_REPO }}
+      GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+      BRANCH: ${{ github.ref_name }}
+      GIT_TERMINAL_PROMPT: "0"
+    steps:
+      - name: Validate configuration
+        run: |
+          set -euo pipefail
+          : "${GITLAB_REPO:?GITLAB_REPO variable is not set}"
+          : "${GITLAB_TOKEN:?GITLAB_TOKEN secret is not set}"
+          case "$GITLAB_REPO" in
+            http://*|https://*)
+              echo "::error::GITLAB_REPO must not include the URL scheme"
+              exit 1
+              ;;
+          esac
+
+      - name: Guard feature branches only
+        run: |
+          set -euo pipefail
+          case "$BRANCH" in
+            feature/*)
+              echo "Mirroring $BRANCH"
+              ;;
+            *)
+              echo "::error::Refusing to mirror branch '$BRANCH'"
+              exit 1
+              ;;
+          esac
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Fetch LFS objects for branch history
+        run: |
+          set -euo pipefail
+          git lfs fetch --all origin "refs/heads/${BRANCH}"
+
+      - name: Upload LFS objects to GitLab
+        run: |
+          set -euo pipefail
+          git remote add gitlab "https://oauth2:${GITLAB_TOKEN}@${GITLAB_REPO}"
+          git lfs push --all gitlab "refs/heads/${BRANCH}"
+
+      - name: Push branch to GitLab
+        run: |
+          set -euo pipefail
+          git push --force --no-verify gitlab \
+            "refs/heads/${BRANCH}:refs/heads/${BRANCH}"
