@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-public class Player : MonoBehaviour {
+public class Player : MonoBehaviour, ITeleportable {
     
     public static Player Instance { get; private set; }
     
