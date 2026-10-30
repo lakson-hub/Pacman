@@ -12,4 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 73828499860ca094a83b2bace22b08d2, type: 3}
   m_Name: PowerPelletSO
   m_EditorClassIdentifier: Assembly-CSharp::PelletSO
-  points: 0
+  points: 50
