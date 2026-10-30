@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-public class Player : MonoBehaviour {
+public class Player : MonoBehaviour, ITeleportable {
     
     public static Player Instance { get; private set; }
     
@@ -76,5 +76,9 @@ public class Player : MonoBehaviour {
 
     public bool GetPlayerIsWalking() {
         return isWalking;
+    }
+
+    public void TeleportTo(Vector2 position) {
+        transform.position = new Vector3(position.x, position.y, transform.position.z);
     }
 }

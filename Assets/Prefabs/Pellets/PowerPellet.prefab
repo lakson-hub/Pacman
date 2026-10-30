@@ -8,6 +8,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 920838009369859510, guid: d00754c46bec2ef40b11b0fe8190a6e1, type: 3}
+      propertyPath: pelletSO
+      value: 
+      objectReference: {fileID: 11400000, guid: b5b0b99e103a15f4e95474f1d42d1d2c, type: 2}
     - target: {fileID: 3145915192409826788, guid: d00754c46bec2ef40b11b0fe8190a6e1, type: 3}
       propertyPath: m_Sprite
       value: 
